@@ -1,15 +1,22 @@
-// Types
-type ProjectType = {
-  id: string | number,
-  title: string,
-  description: string,
-  people: number
+// Project Type
+enum ProjectStatus { Active, Finished }
+
+class Project {
+  constructor(
+    public id: string | number,
+    public title: string,
+    public description: string,
+    public people: number,
+    public status: ProjectStatus
+  ) { }
 }
 
 // Project State Management
+type Listener = (items: Project[]) => void
+
 class ProjectState {
-  private listeners: any[] = []
-  private projects: ProjectType[] = []
+  private listeners: Listener[] = []
+  private projects: Project[] = []
   private static instance: ProjectState
 
   // Cannot create objects
@@ -23,17 +30,18 @@ class ProjectState {
     return ProjectState.instance
   }
 
-  addListener(listenerFn: Function) {
+  addListener(listenerFn: Listener) {
     this.listeners.push(listenerFn)
   }
 
   addProject(title: string, description: string, people: number) {
-    const newProject = {
-      id: Date.now().toString(),
+    const newProject = new Project(
+      Date.now().toString(),
       title,
       description,
-      people
-    }
+      people,
+      ProjectStatus.Active
+    )
 
     this.projects.push(newProject)
 
@@ -105,7 +113,7 @@ class ProjectList {
   private templateElement: HTMLTemplateElement
   private hostElement: HTMLDivElement
   private element: HTMLElement
-  private assignedProjects: any[]
+  private assignedProjects: Project[]
 
   constructor(private type: 'active' | 'finished') {
     this.templateElement = document.getElementById('project-list') as HTMLTemplateElement
@@ -117,8 +125,13 @@ class ProjectList {
       .firstElementChild as HTMLElement
     this.element.id = `${this.type}-projects`
 
-    state.addListener((projects: any[]) => {
-      this.assignedProjects = projects
+    state.addListener((projects: Project[]) => {
+      this.assignedProjects = projects.filter(prj => {
+        return this.type === 'active'
+          ? prj.status === ProjectStatus.Active
+          : prj.status === ProjectStatus.Finished
+      })
+
       this.renderProjects()
     })
 
@@ -128,6 +141,7 @@ class ProjectList {
 
   private renderProjects() {
     const listEl = document.getElementById(`${this.type}-projects-list`) as HTMLUListElement
+    listEl.innerHTML = ''
 
     for (const prjItem of this.assignedProjects) {
       const listItem = document.createElement('li')
