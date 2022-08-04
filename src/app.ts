@@ -1,4 +1,49 @@
-//import { ProjectInput } from "./project";
+// Types
+type ProjectType = {
+  id: string | number,
+  title: string,
+  description: string,
+  people: number
+}
+
+// Project State Management
+class ProjectState {
+  private listeners: any[] = []
+  private projects: ProjectType[] = []
+  private static instance: ProjectState
+
+  // Cannot create objects
+  private constructor() { }
+
+  static getInstance() {
+    if (!ProjectState.instance) {
+      ProjectState.instance = new ProjectState()
+    }
+
+    return ProjectState.instance
+  }
+
+  addListener(listenerFn: Function) {
+    this.listeners.push(listenerFn)
+  }
+
+  addProject(title: string, description: string, people: number) {
+    const newProject = {
+      id: Date.now().toString(),
+      title,
+      description,
+      people
+    }
+
+    this.projects.push(newProject)
+
+    for (const listenerFn of this.listeners) {
+      listenerFn([...this.projects])
+    }
+  }
+}
+
+const state = ProjectState.getInstance()
 
 // Autobind decorator
 function Autobind(_: any, _2: string, descriptor: PropertyDescriptor) {
@@ -55,11 +100,53 @@ function validate(validatableInput: Validatable) {
   return isValid
 }
 
-//function ValidateInput(target: any, methodName: string, descriptor: PropertyDescriptor) {
-//  console.log('target', target);
-//  console.log('methodName', methodName);
-//  console.log('descriptor', descriptor);
-//}
+// ProjectList class
+class ProjectList {
+  private templateElement: HTMLTemplateElement
+  private hostElement: HTMLDivElement
+  private element: HTMLElement
+  private assignedProjects: any[]
+
+  constructor(private type: 'active' | 'finished') {
+    this.templateElement = document.getElementById('project-list') as HTMLTemplateElement
+    this.hostElement = document.getElementById('app') as HTMLDivElement
+    this.assignedProjects = []
+
+    this.element = document
+      .importNode(this.templateElement.content, true)
+      .firstElementChild as HTMLElement
+    this.element.id = `${this.type}-projects`
+
+    state.addListener((projects: any[]) => {
+      this.assignedProjects = projects
+      this.renderProjects()
+    })
+
+    this.attach()
+    this.renderContent()
+  }
+
+  private renderProjects() {
+    const listEl = document.getElementById(`${this.type}-projects-list`) as HTMLUListElement
+
+    for (const prjItem of this.assignedProjects) {
+      const listItem = document.createElement('li')
+      listItem.textContent = prjItem.title
+      listEl.appendChild(listItem)
+    }
+  }
+
+  private renderContent() {
+    const listId = `${this.type}-projects-list`
+
+    this.element.querySelector('ul')!.id = listId
+    this.element.querySelector('h2')!.textContent = this.type.toUpperCase() + ' PROJECTS'
+  }
+
+  private attach() {
+    this.hostElement.insertAdjacentElement('beforeend', this.element)
+  }
+}
 
 // ProjectInput class
 class ProjectInput {
@@ -87,7 +174,6 @@ class ProjectInput {
     this.attach()
   }
 
-  //@ValidateInput
   private gatherUserInput(): [string, string, number] | void {
     const title = this.titleInputElement.value
     const description = this.descriptionInputElement.value
@@ -112,6 +198,7 @@ class ProjectInput {
     // If ALL fields are NOT valid
     if (!validate(titleValid) || !validate(describeValid) || !validate(peopleValid)) {
       // Code for invalid case
+      alert('Wrong input')
       return
     }
 
@@ -127,10 +214,11 @@ class ProjectInput {
   @Autobind
   private submitHandler(event: Event) {
     event.preventDefault()
+
     const userInput = this.gatherUserInput()
     if (Array.isArray(userInput)) {
       const [title, description, people] = userInput
-      console.log('SUBMIT', title, description, people)
+      state.addProject(title, description, people)
       this.clearInputs()
     }
   }
@@ -147,4 +235,6 @@ class ProjectInput {
 
 
 const prjInput = new ProjectInput();
+const activePrjList = new ProjectList('active')
+const finishedPrjList = new ProjectList('finished')
 
